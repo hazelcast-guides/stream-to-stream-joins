@@ -1,0 +1,396 @@
+= Stream-To-Stream Joins with SQL
+:page-layout: tutorial
+:page-product: platform
+:page-categories: SQL, Joins, Stream Processing 
+:page-lang:
+:page-enterprise:
+:page-est-time: 10 mins
+:page-beta: true
+:description: Learn how to join two streams and process the results, using SQL.
+
+{description}
+
+== Context
+
+A stream is an ongoing delivery of events. These events are often of the same type. For example, a stream may contain click events on a website.
+
+If you have two or more streams of related data, you can join them together on a related field, process them, and store the result.
+
+== Example Use Case
+
+You have two streams. One stream contains events for new orders and the other contains events for shipped orders. In this tutorial, you'll use SQL to join these two streams and process them to find out which orders have been successfully shipped, how long it took for them to ship, and the warehouse from which they shipped.
+
+The sample streaming data is adapted from this link:https://developer.confluent.io/tutorials/join-a-stream-to-a-stream/ksql.html[tutorial for Confluent Platform].
+
+== Before you Begin
+
+Before starting this tutorial, make sure that you have the following prerequisites:
+
+* link:https://docs.docker.com/compose/install/[Docker Compose]
+* link:https://git-scm.com/book/en/v2/Getting-Started-Installing-Git[Git]
+
+== Step 1. Clone the Project
+
+To set up the project, you need to download the code from GitHub.
+
+. Clone the GitHub repository.
++
+[tabs] 
+====
+HTTPS:: 
++ 
+--
+```bash
+git clone https://github.com/hazelcast-guides/stream-to-stream-joins.git
+cd stream-to-stream-joins
+```
+--
+SSH:: 
++ 
+--
+```bash
+git clone git@github.com:hazelcast-guides/stream-to-stream-joins.git
+cd stream-to-stream-joins
+```
+--
+====
+
+== Step 2. Start the Docker Containers
+
+In this step, you'll use Docker Compose to start all the Docker containers, including a Kafka broker, Hazelcast Platform, and Management Center.
+
+```bash
+docker compose up -d
+```
+
+You should see the following:
+
+```
+[+] Running 7/7
+ ⠿ Container zookeeper          Started                                                                                                                      0.7s
+ ⠿ Container management-center  Started                                                                                                                      0.6s
+ ⠿ Container hazelcast          Started                                                                                                                      0.7s
+ ⠿ Container broker             Started                                                                                                                      1.2s
+ ⠿ Container schema-registry    Started                                                                                                                      1.8s
+ ⠿ Container ksqldb-server      Started                                                                                                                      2.6s
+ ⠿ Container ksqldb-cli         Started                                                                                                                      3.3s
+```
+
+The Docker containers are running in detatched mode. You can see that they are running, using the following command:
+
+```
+docker ps
+```
+
+To see the logs of your Hazelcast member, use the following command:
+
+```
+docker logs hazelcast
+```
+
+You should see that you have a single member running in the cluster.
+
+```
+Members {size:1, ver:1} [
+	Member [172.19.0.4]:5701 - 15116025-342b-43c0-83f7-a2a90f0281ce this
+]
+```
+
+== Step 3. Create Two Kafka Streams
+
+To create the Kafka stream, you'll use KSQL, which is a streaming SQL engine for Apache Kafka. To submit the KSQL commands, you'll use the ksqlDB CLI.
+
+. Open the ksqlDB CLI.
++
+```bash
+docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
+```
++
+You should see the `ksql>` prompt.
+
+. Create a Kafka stream and its underlying topic to represent the orders.
++
+```sql
+CREATE STREAM _orders (id INT KEY, order_ts VARCHAR, total_amount DOUBLE, customer_name VARCHAR)
+    WITH (KAFKA_TOPIC='orders',
+          VALUE_FORMAT='JSON',
+          TIMESTAMP='order_ts',
+          TIMESTAMP_FORMAT='yyyy-MM-dd''T''HH:mm:ssX',
+          PARTITIONS=2);
+```
++
+The `order_ts` field is the record’s timestamp. To join two streams, they must both include a timestamp.
+
+. Create a Kafka stream and its underlying topic to represent the shipments:
++
+```sql
+CREATE STREAM _shipments (id VARCHAR KEY, ship_ts VARCHAR, order_id INT, warehouse VARCHAR)
+    WITH (KAFKA_TOPIC='shipments',
+          VALUE_FORMAT='JSON',
+          TIMESTAMP='ship_ts',
+          TIMESTAMP_FORMAT='yyyy-MM-dd''T''HH:mm:ssX',
+          PARTITIONS=2);
+```
+
+. Create some order events.
++
+```sql
+INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (1, '2019-03-29T06:01:18Z', 133548.84, 'Ricardo Ferreira');
+INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (2, '2019-03-29T17:02:20Z', 164839.31, 'Tim Berglund');
+INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (3, '2019-03-29T13:44:10Z', 90427.66, 'Robin Moffatt');
+INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (4, '2019-03-29T11:58:25Z', 33462.11, 'Viktor Gamov');
+```
+
+. Create some shipment events.
++
+```sql
+INSERT INTO _shipments (id, ship_ts, order_id, warehouse) VALUES ('ship-ch83360', '2019-03-31T18:13:39Z', 1, 'UPS');
+INSERT INTO _shipments (id, ship_ts, order_id, warehouse) VALUES ('ship-xf72808', '2019-03-31T02:04:13Z', 2, 'UPS');
+INSERT INTO _shipments (id, ship_ts, order_id, warehouse) VALUES ('ship-kr47454', '2019-03-31T20:47:09Z', 3, 'DHL');
+```
+
+. Exit the ksqlDB CLI.
++
+```bash
+exit
+```
+
+== Step 4. Create Mappings to the Kafka Topics
+
+In this step, you'll use the SQL shell in Hazelcast to create a mapping to the Kafka topics. With this mapping, Hazelcast will be able to receive the event streams.
+
+. Open the SQL shell.
++
+```bash
+docker exec -it hazelcast hz-cli sql
+```
+
+. Create a mapping to the `orders` topic.
++
+```sql
+CREATE OR REPLACE MAPPING orders(
+  __key INT, <1>
+  ORDER_TS TIMESTAMP WITH TIME ZONE,
+  TOTAL_AMOUNT DOUBLE,
+  CUSTOMER_NAME VARCHAR)
+TYPE Kafka
+OPTIONS (
+  'keyFormat' = 'int', <1>
+  'valueFormat' = 'json-flat', <2>
+  'auto.offset.reset' = 'earliest', <3>
+  'bootstrap.servers' = 'broker:9092'); <4>
+```
+
+. Make sure that the mapping is correct by running a streaming query on the topic.
++
+```sql
+SELECT * FROM orders;
+```
++
+```
++------------+--------------------+-------------------------+--------------------+
+|       __key|ORDER_TS            |             TOTAL_AMOUNT|CUSTOMER_NAME       |
++------------+--------------------+-------------------------+--------------------+
+|           2|2019-03-29T17:02:20Z|                164839.31|Tim Berglund        |
+|           3|2019-03-29T13:44:10Z|                 90427.66|Robin Moffatt       |
+|           4|2019-03-29T11:58:25Z|                 33462.11|Viktor Gamov        |
+|           1|2019-03-29T06:01:18Z|                133548.84|Ricardo Ferreira    |
+```
+
+. Press kbd:[Ctrl+C] to exit the streaming query.
+
+. Create a mapping to the `shipments` topic.
++
+```sql
+CREATE OR REPLACE MAPPING shipments(
+  __key VARCHAR,
+  SHIP_TS TIMESTAMP WITH TIME ZONE,
+  ORDER_ID INT,
+  WAREHOUSE VARCHAR
+)
+TYPE Kafka
+OPTIONS (
+  'keyFormat' = 'varchar',
+  'valueFormat' = 'json-flat',
+  'auto.offset.reset' = 'earliest',
+  'bootstrap.servers' = 'broker:9092');
+```
+
+. Make sure that the mapping is correct by running a streaming query on the topic.
++
+```sql
+SELECT * FROM shipments;
+```
++
+```
++--------------------+--------------------+------------+--------------------+
+|__key               |SHIP_TS             |    ORDER_ID|WAREHOUSE           |
++--------------------+--------------------+------------+--------------------+
+|ship-ch83360        |2019-03-31T18:13:39Z|           1|UPS                 |
+|ship-xf72808        |2019-03-31T02:04:13Z|           2|UPS                 |
+|ship-kr47454        |2019-03-31T20:47:09Z|           3|DHL                 |
+```
+
+. Press kbd:[Ctrl+C] to exit the streaming query.
+
+== Step 5. Join the Two Streams
+
+In this step, you'll join the two streams to get insights about shipments that are sent within 7 days of the order.
+
+You can join streams in Hazelcast only on a table that defines a allowed lag for late events. Hazelcast drops events that are later than the defined lag and does not include them in the result set.
+
+. Define a view for a table that drops late events when they are one minute or later behind the current latest event.
++
+```sql
+CREATE OR REPLACE VIEW shipments_ordered AS 
+  SELECT * FROM TABLE(IMPOSE_ORDER(
+  TABLE shipments,
+  DESCRIPTOR(SHIP_TS), <1>
+  INTERVAL '1' MINUTE)); <2>
+```
++
+```sql
+CREATE OR REPLACE VIEW orders_ordered AS 
+  SELECT * FROM TABLE(IMPOSE_ORDER(
+  TABLE orders,
+  DESCRIPTOR(ORDER_TS), <1>
+  INTERVAL '1' MINUTE)); <2>
+```
++
+<1> The field that Hazelcast reads to compare to the lag. This field must be a timestamp.
+<2> An allowed lag of one minute.
+
+. Join the two streams. This query finds orders that were shipped within 7 days of being placed.
++
+```sql
+SELECT o.__key AS ORDER_ID,
+  o.ORDER_TS,
+  o.TOTAL_AMOUNT,
+  o.CUSTOMER_NAME,
+  s.__key AS SHIPMENT_ID,
+  s.SHIP_TS,
+  s.WAREHOUSE
+FROM orders_ordered o JOIN shipments_ordered s <1>
+ON o.__key = s.ORDER_ID AND s.SHIP_TS BETWEEN o.ORDER_TS AND o.ORDER_TS + INTERVAL '7' DAYS; <2>
+```
++
+<1> The inner join makes sure that results are output only for orders that have successfully shipped. The query must find a match on both sides of the join.
+<2> A window duration of seven days ignores orders whose shipments don’t occur within 7 days of purchasing. Another added benefit of limiting this query to 7 days of data is that it limits the amount of memory that the query requires.
+
+```
++------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
+|    ORDER_ID|ORDER_TS                 |             TOTAL_AMOUNT|CUSTOMER_NAME       |SHIPMENT_ID         |SHIP_TS                  |WAREHOUSE           |
++------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
+|           2|2019-03-29T17:02:20Z     |                164839.31|Tim Berglund        |ship-xf72808        |2019-03-31T02:04:13Z     |UPS                 |
+|           3|2019-03-29T13:44:10Z     |                 90427.66|Robin Moffatt       |ship-kr47454        |2019-03-31T20:47:09Z     |DHL                 |
+|           1|2019-03-29T06:01:18Z     |                133548.84|Ricardo Ferreira    |ship-ch83360        |2019-03-31T18:13:39Z     |UPS                 |
+```
+
+== Step 6. Create a Materialized View
+
+In this step, you'll define a job to run this streaming query in the background and store the results in a materialized view, using a Hazelcast map.
+
+. Create a mapping to a Hazelcast map called `orders_shipped_within_7_days`.
++
+```sql
+CREATE OR REPLACE MAPPING orders_shipped_within_7_days(
+  __key INT, <1>
+  ORDER_TS TIMESTAMP WITH TIME ZONE, <2>
+  TOTAL_AMOUNT DOUBLE,
+  CUSTOMER_NAME VARCHAR,
+  SHIPMENT_ID VARCHAR,
+  SHIP_TS TIMESTAMP WITH TIME ZONE,
+  WAREHOUSE VARCHAR
+)
+TYPE IMAP
+  OPTIONS (
+    'keyFormat' = 'int', <1>
+    'valueFormat' = 'json-flat'); <2>
+```
++
+<1> The first column must be named `__key`. This column is mapped to the key of map entries.
+<2> The other columns must appear in the same order as the streaming query results so that the data types are mapped correctly.
+
+. Create the job.
++
+```sql
+CREATE JOB get_orders_shipped_within_7_days AS
+  SINK INTO orders_shipped_within_7_days <1>
+  SELECT o.__key AS __key, <2>
+    o.ORDER_TS,
+    o.TOTAL_AMOUNT,
+    o.CUSTOMER_NAME,
+    s.__key AS SHIPMENT_ID,
+    s.SHIP_TS,
+    s.WAREHOUSE
+  FROM orders_ordered o JOIN shipments_ordered s
+  ON o.__key = s.ORDER_ID AND s.SHIP_TS BETWEEN o.ORDER_TS AND o.ORDER_TS + INTERVAL '7' DAYS;
+```
++
+<1> Insert the results into the `orders_shipped_within_7_days ` map.
+<2> Make sure that the selected fields are in the same order as the mapping to the `orders_shipped_within_7_days ` map.
+
+. Query the map to make sure that the job is working.
++
+```sql
+SELECT * FROM orders_shipped_within_7_days;
+```
+
+You should see the following:
+
+```
++------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
+|       __key|ORDER_TS                 |             TOTAL_AMOUNT|CUSTOMER_NAME       |SHIPMENT_ID         |SHIP_TS                  |WAREHOUSE           |
++------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
+|           2|2019-03-29T17:02:20Z     |                164839.31|Tim Berglund        |ship-xf72808        |2019-03-31T02:04:13Z     |UPS                 |
+|           1|2019-03-29T06:01:18Z     |                133548.84|Ricardo Ferreira    |ship-ch83360        |2019-03-31T18:13:39Z     |UPS                 |
+|           3|2019-03-29T13:44:10Z     |                 90427.66|Robin Moffatt       |ship-kr47454        |2019-03-31T20:47:09Z     |DHL                 |
++------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
+```
+
+If you left this query running, it would continue to add new results for orders shipped within 7 days. You can connect your applications to the Hazelcast cluster and query this map to get further insights.
+
+== Step 7. Clean Up
+
+Stop and remove your Docker containers.
+
+```bash
+docker compose stop
+docker compose rm
+```
+
+== Summary
+
+In this tutorial, you learned:
+
+- How to get deeper insights from two related streams by joining them together.
+- How to run the streaming query in the background and store the results in a materialized view, using a job.
+
+== Next Steps
+
+By default, mappings and maps are not persisted. When you stop your cluster, all mappings and map data are deleted. 
+To persist this data, you can enable the xref:hazelcast:storage:persistence.adoc[Persistence] feature in the cluster configuration. Or, you can use Hazelcast {viridian}, which is persists this data by default. For an introduction to querying Kafka streams in Hazelcast {viridian}, see xref:tutorials:create-materialized-view-from-kafka.adoc[Query Streams from Confluent Cloud].
+
+The materialized view would continue to store more and more results as new orders and shipment events are generated. To control the size of the map and the amount of memory it consumes, you can configure it with limits. See xref:hazelcast:data-structures:managing-map-memory.adoc[Managing Map Memory].
+
+To manage and monitor your cluster, you can use Management Center. This project runs Management Center at http://locahost:8080. See the xref:management-center:getting-started:overview.adoc[Management Center documentation] for details.
+
+== See Also
+
+- xref:tutorials:tutorials.adoc[More tutorials].
+
+- xref:hazelcast:sql:sql-overview.adoc[SQL reference].
+
+- xref:hazelcast:sql:querying-streams[Stream Processing in SQL]
+
+
+
+
+
+
+
+
+
+
+
+
