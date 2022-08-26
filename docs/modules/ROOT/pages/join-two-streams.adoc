@@ -382,15 +382,3 @@ To manage and monitor your cluster, you can use Management Center. This project 
 - xref:hazelcast:sql:sql-overview.adoc[SQL reference].
 
 - xref:hazelcast:sql:querying-streams[Stream Processing in SQL]
-
-
-
-
-
-
-
-
-
-
-
-
