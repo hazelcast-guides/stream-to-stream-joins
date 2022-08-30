@@ -3,16 +3,16 @@
 :page-product: platform
 :page-categories: SQL, Joins, Stream Processing 
 :page-lang: sql
-:page-enterprise:
+:page-enterprise: false
 :page-est-time: 10 mins
 :page-beta: true
-:description: Learn how to join two streams and process the results, using SQL.
+:description: Learn how to join two streams of data and process the results, using SQL.
 
 {description}
 
 == Context
 
-A stream is an ongoing delivery of events. These events are often of the same type. For example, a stream may contain click events on a website.
+A stream of data is an ongoing delivery of data events. These events are often of the same type. For example, a stream may contain click events on a website.
 
 If you have two or more streams of related data, you can join them together on a related field, process them, and store the result.
 
