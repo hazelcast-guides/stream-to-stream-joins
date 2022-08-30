@@ -2,7 +2,7 @@
 :page-layout: tutorial
 :page-product: platform
 :page-categories: SQL, Joins, Stream Processing 
-:page-lang:
+:page-lang: sql
 :page-enterprise:
 :page-est-time: 10 mins
 :page-beta: true
