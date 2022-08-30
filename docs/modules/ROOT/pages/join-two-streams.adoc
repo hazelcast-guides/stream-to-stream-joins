@@ -180,6 +180,11 @@ OPTIONS (
   'auto.offset.reset' = 'earliest', <3>
   'bootstrap.servers' = 'broker:9092'); <4>
 ```
++
+<1> The kafka record key, which is the ID of the orders and shipments. You must use the `__key` field to map this record key as a key in Hazelcast.
+<2> Map the Kafka values to JSON, using the `json-flat` format. This format maps each top-level JSON field to its own column.
+<3> Tell Hazelcast to read from the beginning of the topic so that you can read the values that you already added to it.
+<4> The address of the Kafka broker.
 
 . Make sure that the mapping is correct by running a streaming query on the topic.
 +
@@ -381,4 +386,6 @@ To manage and monitor your cluster, you can use Management Center. This project 
 
 - xref:hazelcast:sql:sql-overview.adoc[SQL reference].
 
-- xref:hazelcast:sql:querying-streams[Stream Processing in SQL]
+- xref:hazelcast:sql:querying-streams[].
+
+- xref:hazelcast:sql:working-with-json.adoc[].
