@@ -1,7 +1,7 @@
 = Stream-To-Stream Joins with SQL
 :page-layout: tutorial
 :page-product: platform
-:page-categories: SQL, Joins, Stream Processing 
+:page-categories: Joins, Stream Processing 
 :page-lang: sql
 :page-enterprise:
 :page-est-time: 10 mins
