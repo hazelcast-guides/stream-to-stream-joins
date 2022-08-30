@@ -81,7 +81,7 @@ services:
     ports:
     - "5701:5701"
   management-center:
-    image: hazelcast/management-center:5.2-BETA-1
+    image: hazelcast/management-center:5.2-SNAPSHOT
     hostname: management-center
     container_name: management-center
     ports:
