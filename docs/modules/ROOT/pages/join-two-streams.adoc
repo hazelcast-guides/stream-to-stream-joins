@@ -18,7 +18,7 @@ If you have two or more streams of related data, you can join them together on a
 
 == Example Use Case
 
-You have two streams. One stream contains events for new orders and the other contains events for shipped orders. You need to join these two streams to find out which orders have been successfully shipped within seven days, and from which warehouse they shipped.
+You have two streams. One stream contains events for new orders and the other contains events for shipped orders. You need to join these two streams to find out which orders have been successfully shipped within seven days, and from which warehouse they were shipped.
 
 The sample streaming data is adapted from this link:https://developer.confluent.io/tutorials/join-a-stream-to-a-stream/ksql.html[tutorial for Confluent Platform].
 
