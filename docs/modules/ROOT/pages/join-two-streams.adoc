@@ -20,8 +20,6 @@ If you have two or more streams of related data, you can join them together on a
 
 You have two streams. One stream contains events for new orders and the other contains events for shipped orders. You need to join these two streams to find out which orders have been successfully shipped within seven days, and from which warehouse they shipped.
 
-The sample streaming data is adapted from this link:https://developer.confluent.io/tutorials/join-a-stream-to-a-stream/ksql.html[tutorial for Confluent Platform].
-
 == Before you Begin
 
 Before starting this tutorial, make sure that you have the following prerequisites:
@@ -66,14 +64,11 @@ docker compose up -d
 You should see the following:
 
 ```
-[+] Running 7/7
+[+] Running 4/4
  ⠿ Container zookeeper          Started                                                                                                                      0.7s
  ⠿ Container management-center  Started                                                                                                                      0.6s
  ⠿ Container hazelcast          Started                                                                                                                      0.7s
  ⠿ Container broker             Started                                                                                                                      1.2s
- ⠿ Container schema-registry    Started                                                                                                                      1.8s
- ⠿ Container ksqldb-server      Started                                                                                                                      2.6s
- ⠿ Container ksqldb-cli         Started                                                                                                                      3.3s
 ```
 
 The Docker containers are running in detatched mode. You can see that they are running, using the following command:
@@ -96,63 +91,20 @@ Members {size:1, ver:1} [
 ]
 ```
 
-== Step 3. Create Two Kafka Streams
+== Step 3. Create Two Kafka Topics
 
-To create the Kafka stream, you'll use KSQL, which is a streaming SQL engine for Apache Kafka. To submit the KSQL commands, you'll use the ksqlDB CLI.
+To create the Kafka topics, you'll use the `kafka-console-producer` script that's built into the Kafka broker.
 
-. Open the ksqlDB CLI.
+. Create the `orders` topic and add some records to it.
 +
 ```bash
-docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
-```
-+
-You should see the `ksql>` prompt.
-
-. Create a Kafka stream and its underlying topic to represent the orders.
-+
-```sql
-CREATE STREAM _orders (id INT KEY, order_ts VARCHAR, total_amount DOUBLE, customer_name VARCHAR)
-    WITH (KAFKA_TOPIC='orders',
-          VALUE_FORMAT='JSON',
-          TIMESTAMP='order_ts',
-          TIMESTAMP_FORMAT='yyyy-MM-dd''T''HH:mm:ssX',
-          PARTITIONS=2);
-```
-+
-The `order_ts` field is the record’s timestamp. To join two streams, they must both include a timestamp.
-
-. Create a Kafka stream and its underlying topic to represent the shipments:
-+
-```sql
-CREATE STREAM _shipments (id VARCHAR KEY, ship_ts VARCHAR, order_id INT, warehouse VARCHAR)
-    WITH (KAFKA_TOPIC='shipments',
-          VALUE_FORMAT='JSON',
-          TIMESTAMP='ship_ts',
-          TIMESTAMP_FORMAT='yyyy-MM-dd''T''HH:mm:ssX',
-          PARTITIONS=2);
+docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic orders < orders.jsonl
 ```
 
-. Create some order events.
-+
-```sql
-INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (1, '2019-03-29T06:01:18Z', 133548.84, 'Ricardo Ferreira');
-INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (2, '2019-03-29T17:02:20Z', 164839.31, 'Tim Berglund');
-INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (3, '2019-03-29T13:44:10Z', 90427.66, 'Robin Moffatt');
-INSERT INTO _orders (id, order_ts, total_amount, customer_name) VALUES (4, '2019-03-29T11:58:25Z', 33462.11, 'Viktor Gamov');
-```
-
-. Create some shipment events.
-+
-```sql
-INSERT INTO _shipments (id, ship_ts, order_id, warehouse) VALUES ('ship-ch83360', '2019-03-31T18:13:39Z', 1, 'UPS');
-INSERT INTO _shipments (id, ship_ts, order_id, warehouse) VALUES ('ship-xf72808', '2019-03-31T02:04:13Z', 2, 'UPS');
-INSERT INTO _shipments (id, ship_ts, order_id, warehouse) VALUES ('ship-kr47454', '2019-03-31T20:47:09Z', 3, 'DHL');
-```
-
-. Exit the ksqlDB CLI.
+. Create the `shipments` topic and add some records to it.
 +
 ```bash
-exit
+docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic shipments < shipments.jsonl
 ```
 
 == Step 4. Create Mappings to the Kafka Topics
@@ -169,10 +121,10 @@ docker exec -it hazelcast hz-cli sql
 +
 ```sql
 CREATE OR REPLACE MAPPING orders(
-  __key INT, <1>
-  ORDER_TS TIMESTAMP WITH TIME ZONE,
-  TOTAL_AMOUNT DOUBLE,
-  CUSTOMER_NAME VARCHAR)
+  id INT,
+  order_ts TIMESTAMP WITH TIME ZONE,
+  total_amount DOUBLE,
+  customer_name VARCHAR)
 TYPE Kafka
 OPTIONS (
   'keyFormat' = 'int', <1>
@@ -181,10 +133,10 @@ OPTIONS (
   'bootstrap.servers' = 'broker:9092'); <4>
 ```
 +
-<1> The kafka record key, which is the ID of the orders and shipments. You must use the `__key` field to map this record key as a key in Hazelcast.
-<2> Map the Kafka values to JSON, using the `json-flat` format. This format maps each top-level JSON field to its own column.
+<1> The kafka record key, which is the ID of the orders and shipments.
+<2> Map the Kafka records to JSON, using the `json-flat` format. This format maps each top-level JSON field to its own column.
 <3> Tell Hazelcast to read from the beginning of the topic so that you can read the values that you already added to it.
-<4> The address of the Kafka broker.
+<4> The address of the Kafka broker that Hazelcast connects to.
 
 . Make sure that the mapping is correct by running a streaming query on the topic.
 +
@@ -193,13 +145,13 @@ SELECT * FROM orders;
 ```
 +
 ```
-+------------+--------------------+-------------------------+--------------------+
-|       __key|ORDER_TS            |             TOTAL_AMOUNT|CUSTOMER_NAME       |
-+------------+--------------------+-------------------------+--------------------+
-|           2|2019-03-29T17:02:20Z|                164839.31|Tim Berglund        |
-|           3|2019-03-29T13:44:10Z|                 90427.66|Robin Moffatt       |
-|           4|2019-03-29T11:58:25Z|                 33462.11|Viktor Gamov        |
-|           1|2019-03-29T06:01:18Z|                133548.84|Ricardo Ferreira    |
++------------+-------------------------+-------------------------+--------------------+
+|          id|order_ts                 |             total_amount|customer_name       |
++------------+-------------------------+-------------------------+--------------------+
+|           1|2022-03-29T06:01:18Z     |                133548.84|Amal                |
+|           2|2022-03-29T17:02:20Z     |                164839.31|Alex                |
+|           3|2022-03-29T13:44:10Z     |                 90427.66|Hao                 |
+|           4|2022-03-29T11:58:25Z     |                 33462.11|Cruz                |
 ```
 
 . Press kbd:[Ctrl+C] to exit the streaming query.
@@ -208,10 +160,10 @@ SELECT * FROM orders;
 +
 ```sql
 CREATE OR REPLACE MAPPING shipments(
-  __key VARCHAR,
-  SHIP_TS TIMESTAMP WITH TIME ZONE,
-  ORDER_ID INT,
-  WAREHOUSE VARCHAR
+  id VARCHAR,
+  ship_ts TIMESTAMP WITH TIME ZONE,
+  order_id INT,
+  warehouse VARCHAR
 )
 TYPE Kafka
 OPTIONS (
@@ -228,12 +180,12 @@ SELECT * FROM shipments;
 ```
 +
 ```
-+--------------------+--------------------+------------+--------------------+
-|__key               |SHIP_TS             |    ORDER_ID|WAREHOUSE           |
-+--------------------+--------------------+------------+--------------------+
-|ship-ch83360        |2019-03-31T18:13:39Z|           1|UPS                 |
-|ship-xf72808        |2019-03-31T02:04:13Z|           2|UPS                 |
-|ship-kr47454        |2019-03-31T20:47:09Z|           3|DHL                 |
++--------------------+-------------------------+------------+--------------------+
+|id                  |ship_ts                  |    order_id|warehouse           |
++--------------------+-------------------------+------------+--------------------+
+|ship-ch83360        |2022-03-31T18:13:39Z     |           1|UPS                 |
+|ship-xf72808        |2022-03-31T02:04:13Z     |           2|UPS                 |
+|ship-kr47454        |2022-03-31T20:47:09Z     |           3|DHL                 |
 ```
 
 . Press kbd:[Ctrl+C] to exit the streaming query.
@@ -244,13 +196,13 @@ In this step, you'll join the two streams to get insights about shipments that a
 
 You can join streams in Hazelcast only on a table that defines a allowed lag for late events. Hazelcast drops events that are later than the defined lag and does not include them in the result set.
 
-. Define a view for a table that drops late events when they are one minute or later behind the current latest event.
+. Drop late events when they are one minute or later behind the current latest event.
 +
 ```sql
 CREATE OR REPLACE VIEW shipments_ordered AS 
   SELECT * FROM TABLE(IMPOSE_ORDER(
   TABLE shipments,
-  DESCRIPTOR(SHIP_TS), <1>
+  DESCRIPTOR(ship_ts), <1>
   INTERVAL '1' MINUTE)); <2>
 ```
 +
@@ -258,7 +210,7 @@ CREATE OR REPLACE VIEW shipments_ordered AS
 CREATE OR REPLACE VIEW orders_ordered AS 
   SELECT * FROM TABLE(IMPOSE_ORDER(
   TABLE orders,
-  DESCRIPTOR(ORDER_TS), <1>
+  DESCRIPTOR(order_ts), <1>
   INTERVAL '1' MINUTE)); <2>
 ```
 +
@@ -268,15 +220,15 @@ CREATE OR REPLACE VIEW orders_ordered AS
 . Join the two streams. This query finds orders that were shipped within 7 days of being placed.
 +
 ```sql
-SELECT o.__key AS ORDER_ID,
-  o.ORDER_TS,
-  o.TOTAL_AMOUNT,
-  o.CUSTOMER_NAME,
-  s.__key AS SHIPMENT_ID,
-  s.SHIP_TS,
-  s.WAREHOUSE
+SELECT o.id AS order_id,
+  o.order_ts,
+  o.total_amount,
+  o.customer_name,
+  s.id AS shipment_id,
+  s.ship_ts,
+  s.warehouse
 FROM orders_ordered o JOIN shipments_ordered s <1>
-ON o.__key = s.ORDER_ID AND s.SHIP_TS BETWEEN o.ORDER_TS AND o.ORDER_TS + INTERVAL '7' DAYS; <2>
+ON o.id = s.order_id AND s.ship_ts BETWEEN o.order_ts AND o.order_ts + INTERVAL '7' DAYS; <2>
 ```
 +
 <1> The inner join makes sure that results are output only for orders that have successfully shipped. The query must find a match on both sides of the join.
@@ -284,11 +236,11 @@ ON o.__key = s.ORDER_ID AND s.SHIP_TS BETWEEN o.ORDER_TS AND o.ORDER_TS + INTERV
 
 ```
 +------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
-|    ORDER_ID|ORDER_TS                 |             TOTAL_AMOUNT|CUSTOMER_NAME       |SHIPMENT_ID         |SHIP_TS                  |WAREHOUSE           |
+|    order_id|order_ts                 |             total_amount|customer_name       |shipment_id         |ship_ts                  |warehouse           |
 +------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
-|           2|2019-03-29T17:02:20Z     |                164839.31|Tim Berglund        |ship-xf72808        |2019-03-31T02:04:13Z     |UPS                 |
-|           3|2019-03-29T13:44:10Z     |                 90427.66|Robin Moffatt       |ship-kr47454        |2019-03-31T20:47:09Z     |DHL                 |
-|           1|2019-03-29T06:01:18Z     |                133548.84|Ricardo Ferreira    |ship-ch83360        |2019-03-31T18:13:39Z     |UPS                 |
+|           1|2022-03-29T06:01:18Z     |                133548.84|Amal                |ship-ch83360        |2022-03-31T18:13:39Z     |UPS                 |
+|           2|2022-03-29T17:02:20Z     |                164839.31|Alex                |ship-xf72808        |2022-03-31T02:04:13Z     |UPS                 |
+|           3|2022-03-29T13:44:10Z     |                 90427.66|Hao                 |ship-kr47454        |2022-03-31T20:47:09Z     |DHL                 |
 ```
 
 == Step 6. Create a Materialized View
@@ -300,12 +252,12 @@ In this step, you'll define a job to run this streaming query in the background 
 ```sql
 CREATE OR REPLACE MAPPING orders_shipped_within_7_days(
   __key INT, <1>
-  ORDER_TS TIMESTAMP WITH TIME ZONE, <2>
-  TOTAL_AMOUNT DOUBLE,
-  CUSTOMER_NAME VARCHAR,
-  SHIPMENT_ID VARCHAR,
-  SHIP_TS TIMESTAMP WITH TIME ZONE,
-  WAREHOUSE VARCHAR
+  order_ts TIMESTAMP WITH TIME ZONE, <2>
+  total_amount DOUBLE,
+  customer_name VARCHAR,
+  shipment_id VARCHAR,
+  ship_ts TIMESTAMP WITH TIME ZONE,
+  warehouse VARCHAR
 )
 TYPE IMAP
   OPTIONS (
@@ -321,15 +273,15 @@ TYPE IMAP
 ```sql
 CREATE JOB get_orders_shipped_within_7_days AS
   SINK INTO orders_shipped_within_7_days <1>
-  SELECT o.__key AS __key, <2>
-    o.ORDER_TS,
-    o.TOTAL_AMOUNT,
-    o.CUSTOMER_NAME,
-    s.__key AS SHIPMENT_ID,
-    s.SHIP_TS,
-    s.WAREHOUSE
-  FROM orders_ordered o JOIN shipments_ordered s
-  ON o.__key = s.ORDER_ID AND s.SHIP_TS BETWEEN o.ORDER_TS AND o.ORDER_TS + INTERVAL '7' DAYS;
+  SELECT o.id AS __key, <2>
+    o.order_ts,
+    o.total_amount,
+    o.customer_name,
+    s.id AS shipment_id,
+    s.ship_ts,
+    s.warehouse
+  FROM orders_ordered o JOIN shipments_ordered s <1>
+  ON o.id = s.order_id AND s.ship_ts BETWEEN o.order_ts AND o.order_ts + INTERVAL '7' DAYS;
 ```
 +
 <1> Insert the results into the `orders_shipped_within_7_days ` map.
@@ -345,11 +297,11 @@ You should see the following:
 
 ```
 +------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
-|       __key|ORDER_TS                 |             TOTAL_AMOUNT|CUSTOMER_NAME       |SHIPMENT_ID         |SHIP_TS                  |WAREHOUSE           |
+|       __key|order_ts                 |             total_amount|customer_name       |shipment_id         |ship_ts                  |warehouse           |
 +------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
-|           2|2019-03-29T17:02:20Z     |                164839.31|Tim Berglund        |ship-xf72808        |2019-03-31T02:04:13Z     |UPS                 |
-|           1|2019-03-29T06:01:18Z     |                133548.84|Ricardo Ferreira    |ship-ch83360        |2019-03-31T18:13:39Z     |UPS                 |
-|           3|2019-03-29T13:44:10Z     |                 90427.66|Robin Moffatt       |ship-kr47454        |2019-03-31T20:47:09Z     |DHL                 |
+|           2|2022-03-29T17:02:20Z     |                164839.31|Alex                |ship-xf72808        |2022-03-31T02:04:13Z     |UPS                 |
+|           1|2022-03-29T06:01:18Z     |                133548.84|Amal                |ship-ch83360        |2022-03-31T18:13:39Z     |UPS                 |
+|           3|2022-03-29T13:44:10Z     |                 90427.66|Hao                 |ship-kr47454        |2022-03-31T20:47:09Z     |DHL                 |
 +------------+-------------------------+-------------------------+--------------------+--------------------+-------------------------+--------------------+
 ```
 
