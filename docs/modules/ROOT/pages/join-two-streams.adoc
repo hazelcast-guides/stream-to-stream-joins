@@ -352,7 +352,7 @@ To manage and monitor your cluster, you can use Management Center. This project 
 
 == See Also
 
-- xref:tutorials:tutorials.adoc[More tutorials].
+- xref:tutorials:index.adoc[More tutorials].
 
 - xref:hazelcast:sql:sql-overview.adoc[SQL reference].
 
