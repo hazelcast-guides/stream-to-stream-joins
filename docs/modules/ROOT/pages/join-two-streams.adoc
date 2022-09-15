@@ -325,12 +325,30 @@ In this tutorial, you learned:
 
 == Next Steps
 
+.Persist mappings and maps
+[%collapsible]
+====
 By default, mappings and maps are not persisted. When you stop your cluster, all mappings and map data are deleted. 
 To persist this data, you can enable the xref:hazelcast:storage:persistence.adoc[Persistence] feature in the cluster configuration. Or, you can use Hazelcast {viridian}, which is persists this data by default. For an introduction to querying Kafka streams in Hazelcast {viridian}, see xref:tutorials:create-materialized-view-from-kafka.adoc[Query Streams from Confluent Cloud].
+====
 
+.Manage memory
+[%collapsible]
+====
 The materialized view would continue to store more and more results as new orders and shipment events are generated. To control the size of the map and the amount of memory it consumes, you can configure it with limits. See xref:hazelcast:data-structures:managing-map-memory.adoc[Managing Map Memory].
+====
 
+.Manage jobs
+[%collapsible]
+====
+To manage your streaming job, see xref:hazelcast:pipelines:job-management.adoc[].
+====
+
+.Explore Management Center
+[%collapsible]
+====
 To manage and monitor your cluster, you can use Management Center. This project runs Management Center at http://locahost:8080. See the xref:management-center:getting-started:overview.adoc[Management Center documentation] for details.
+====
 
 == See Also
 
