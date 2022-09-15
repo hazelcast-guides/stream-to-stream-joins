@@ -36,7 +36,7 @@ services:
     container_name: hazelcast
 
   management-center:
-    image: hazelcast/management-center:latest-dev
+    image: hazelcast/management-center:5.2-BETA-1
     hostname: management-center
     container_name: management-center
     ports:
