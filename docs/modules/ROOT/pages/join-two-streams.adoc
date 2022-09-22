@@ -329,7 +329,7 @@ In this tutorial, you learned:
 [%collapsible]
 ====
 By default, mappings and maps are not persisted. When you stop your cluster, all mappings and map data are deleted. 
-To persist this data, you can enable the xref:hazelcast:storage:persistence.adoc[Persistence] feature in the cluster configuration. Or, you can use Hazelcast {viridian}, which is persists this data by default. For an introduction to querying Kafka streams in Hazelcast {viridian}, see xref:tutorials:create-materialized-view-from-kafka.adoc[Query Streams from Confluent Cloud].
+To persist this data, you can enable the xref:hazelcast:storage:persistence.adoc[Persistence] feature in the cluster configuration. Or, you can use Hazelcast {viridian}, which is persists this data by default. For an introduction to querying Kafka streams in Hazelcast {viridian}, see xref:tutorials:ROOT:create-materialized-view-from-kafka.adoc[Query Streams from Confluent Cloud].
 ====
 
 .Manage memory
