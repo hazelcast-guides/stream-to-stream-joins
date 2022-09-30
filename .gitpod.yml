@@ -1,6 +1,7 @@
 # Commands to start on workspace startup
 tasks:
-  - command: |
+  - name: setup
+    command: |
       docker compose up -d
       docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic orders < orders.jsonl
       docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic shipments < shipments.jsonl
