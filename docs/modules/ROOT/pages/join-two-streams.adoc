@@ -10,7 +10,8 @@
 
 {description}
 
-image:https://gitpod.io/button/open-in-gitpod.svg[link=https://gitpod.io/#https://github.com/JakeSCahill/stream-to-stream-joins]
+[.interactive-button]
+link:https://gitpod.io/#https://github.com/JakeSCahill/stream-to-stream-joins[Try the interactive example,window=_blank]
 
 == Context
 
