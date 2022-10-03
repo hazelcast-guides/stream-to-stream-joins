@@ -11,7 +11,7 @@
 {description}
 
 [.interactive-button]
-link:https://gitpod.io/#https://github.com/JakeSCahill/stream-to-stream-joins[Try the interactive example,window=_blank]
+link:https://gitpod.io/#https://github.com/JakeSCahill/stream-to-stream-joins[Try it in your browser,window=_blank]
 
 == Context
 

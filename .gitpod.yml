@@ -13,7 +13,11 @@ tasks:
     init: gp sync-await compose
     command: docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic shipments < shipments.jsonl
   - name: SQL
-    before: echo "Hello"
+    before: >
+      clear
+      echo "The clusters are being created in the background." &&
+      echo "Check the Clusters tab on the right to see the progress." &&
+      echo "When all the processes have finished, this terminal will open a SQL shell."
     init: gp sync-await orders
     command: docker exec -it hazelcast hz-cli sql
 # Ports to expose on workspace startup
