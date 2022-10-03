@@ -13,10 +13,8 @@ tasks:
     init: gp sync-await compose
     command: docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic shipments < shipments.jsonl
   - name: SQL
-    init: gp sync-await bundle
-    command: >
-      gp sync-await orders &&
-      docker exec -it hazelcast hz-cli sql
+    init: gp sync-await orders
+    command: docker exec -it hazelcast hz-cli sql
 # Ports to expose on workspace startup
 ports:
   - port: 8080
