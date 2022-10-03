@@ -10,6 +10,8 @@
 
 {description}
 
+image:https://gitpod.io/button/open-in-gitpod.svg[link=https://gitpod.io/#https://github.com/JakeSCahill/stream-to-stream-joins]
+
 == Context
 
 A stream of data is an ongoing delivery of data events. These events are often of the same type. For example, a stream may contain click events on a website.

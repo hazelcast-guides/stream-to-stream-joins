@@ -1,10 +1,21 @@
 # Commands to start on workspace startup
 tasks:
-  - name: setup
-    command: |
-      docker compose up -d
-      docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic orders < orders.jsonl
-      docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic shipments < shipments.jsonl
+  - name: Clusters
+    command: >
+      docker compose up -d &&
+      gp sync-done compose
+  - name: Orders
+    init: gp sync-await compose
+    command: >
+      docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic orders < orders.jsonl &&
+      gp sync-done orders
+  - name: Shipments
+    init: gp sync-await compose
+    command: docker exec -i broker kafka-console-producer --broker-list broker:9092 --topic shipments < shipments.jsonl
+  - name: SQL
+    init: gp sync-await bundle
+    command: >
+      gp sync-await orders &&
       docker exec -it hazelcast hz-cli sql
 # Ports to expose on workspace startup
 ports:
