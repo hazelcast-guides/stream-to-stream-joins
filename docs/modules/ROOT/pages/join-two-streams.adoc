@@ -328,6 +328,12 @@ In this tutorial, you learned:
 
 == Next Steps
 
+.Run on Hazelcast {hazelcast-cloud}
+[%collapsible]
+====
+Learn how to xref:create-materialized-view-from-kafka.adoc[run streaming queries on Hazelcast {hazelcast-cloud}].
+====
+
 .Persist mappings and maps
 [%collapsible]
 ====
