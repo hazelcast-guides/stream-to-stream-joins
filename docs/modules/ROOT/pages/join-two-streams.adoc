@@ -11,7 +11,7 @@
 {description}
 
 [.interactive-button]
-link:https://gitpod.io/#https://github.com/JakeSCahill/stream-to-stream-joins[Try it in your browser,window=_blank]
+link:https://gitpod.io/#https://github.com/hazelcast-guides/stream-to-stream-joins[Try it in your browser,window=_blank]
 
 == Context
 
@@ -338,7 +338,7 @@ Learn how to xref:create-materialized-view-from-kafka.adoc[run streaming queries
 [%collapsible]
 ====
 By default, mappings and maps are not persisted. When you stop your cluster, all mappings and map data are deleted. 
-To persist this data, you can enable the xref:hazelcast:storage:persistence.adoc[Persistence] feature in the cluster configuration. Or, you can use Hazelcast {viridian}, which is persists this data by default. For an introduction to querying Kafka streams in Hazelcast {viridian}, see xref:tutorials:ROOT:create-materialized-view-from-kafka.adoc[Query Streams from Confluent Cloud].
+To persist this data, you can enable the xref:hazelcast:storage:persistence.adoc[Persistence] feature in the cluster configuration. Or, you can use Hazelcast {hazelcast-cloud}, which is persists this data by default. For an introduction to querying Kafka streams in Hazelcast {hazelcast-cloud}, see xref:tutorials:ROOT:create-materialized-view-from-kafka.adoc[Query Streams from Confluent Cloud].
 ====
 
 .Manage memory
