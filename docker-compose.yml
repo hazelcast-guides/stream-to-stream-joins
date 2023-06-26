@@ -31,12 +31,12 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
   hazelcast:
-    image: hazelcast/hazelcast:5.2-BETA-1
+    image: hazelcast/hazelcast
     hostname: hazelcast
     container_name: hazelcast
 
   management-center:
-    image: hazelcast/management-center:5.2-BETA-1
+    image: hazelcast/management-center
     hostname: management-center
     container_name: management-center
     ports:
