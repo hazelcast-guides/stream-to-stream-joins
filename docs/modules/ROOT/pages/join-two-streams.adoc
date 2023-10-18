@@ -5,7 +5,6 @@
 :page-lang: sql
 :page-enterprise: false
 :page-est-time: 10 mins
-:page-beta: true
 :description: Learn how to join two streams of data and process the results, using SQL.
 
 {description}
