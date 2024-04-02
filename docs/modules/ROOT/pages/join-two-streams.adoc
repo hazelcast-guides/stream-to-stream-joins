@@ -73,7 +73,7 @@ You should see the following:
  ⠿ Container broker             Started                                                                                                                      1.2s
 ```
 
-The Docker containers are running in detatched mode. You can see that they are running, using the following command:
+The Docker containers are running in detached mode. You can see that they are running, using the following command:
 
 ```
 docker ps
